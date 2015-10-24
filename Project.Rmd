@@ -1,0 +1,88 @@
+---
+title: "Exercise Prediction Model Analysis"
+author: "Vinay"
+date: "October 24, 2015"
+output: html_document
+---
+
+#Summary 
+
+This project's goal is to build model to predict activity quality from activity monitors. Data provided by http://groupware.les.inf.puc-rio.br/har is used in this poject to train the model. Based on this data training set accuracy was noted as 99%. 
+
+#Prepare Environment
+```{r, echo=FALSE}
+library(caret)
+library(randomForest)
+library(doParallel)
+cl<-makeCluster(detectCores())
+registerDoParallel(cl)
+```
+
+
+#Load and Clean Data
+Load data and remove NA and non numberic variables. Exclude variables that have time, or names in it, also new_window. Columns 1..6
+```{r}
+trainRawData <- read.csv("pml-training.csv",na.strings=c("NA",""))
+newdataRawData <- read.csv("pml-testing.csv",na.strings=c("NA",""))
+NAs <- apply(trainRawData,2,function(x) {sum(is.na(x))}) 
+trainData <- trainRawData[,which(NAs == 0)]
+newData <- newdataRawData[,which(NAs == 0)]
+
+# Exclude variables that have time, or names in it, also new_window. Columns 1..6
+removeIndex <- as.integer(c(1,2,3,4,5,6))
+trainData <- trainData[,-removeIndex]
+newData <- newData[,-removeIndex]
+
+```
+
+#Prediction Study Design
+I consider sample set as small due to having 19622 obs on 6 persons. So I use cross validation in study design. Approximately 70% of the data is used for the training and remaining 30% for cross validation.
+
+```{r}
+trainIndex <- createDataPartition(y = trainData$classe, p=0.7,list=FALSE)
+trainSet <- trainData[trainIndex,]
+testSet <- trainData[-trainIndex,]
+```
+
+#Training
+Train model using radom Forecast and cross validation as train control.
+```{r}
+trainCtrl = trainControl(method = "cv", number = 4)
+modelFit <- train(trainSet$classe ~.,data = trainSet, method="rf", trControl = trainCtrl)
+print(modelFit, digits=3)
+
+```
+
+#Testing 
+now test the model using cross validation data. Confusion matrix and statistics are shown below. Testing model using test data shows accuracy of 99.8% with confidence interval 99.6% to 99.9%. 
+```{r}
+predictionsTest <- predict(modelFit, testSet)
+print(confusionMatrix(predictionsTest, testSet$classe), digits=4)
+```
+
+#out of sample error
+Previous section showed various statistics when model is used to predict classe on a data that model never saw. Based on those statistics out of sample error is calcualted as (1 - 0.9983) = 0.0017.
+
+#Predict on new Data 
+```{r}
+predictedclasse <- predict(modelFit, newData)
+length(predictedclasse)
+```
+
+#Prediction Assignment Submission
+This section is for generating files for assignment submission.
+
+```{r}
+pml_write_files = function(predictedclasse){
+  n = length(predictedclasse)
+  for(i in 1:n){
+    filename = paste0("problem_id_",i,".txt")
+    write.table(predictedclasse[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+  }
+}
+
+pml_write_files(predictedclasse)
+
+```
+
+
