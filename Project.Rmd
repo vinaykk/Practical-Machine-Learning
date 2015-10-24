@@ -45,7 +45,7 @@ testSet <- trainData[-trainIndex,]
 ```
 
 #Training
-Train model using radom Forecast and cross validation as train control.
+Train model using Random Forecast method and cross validation as train control.
 ```{r}
 trainCtrl = trainControl(method = "cv", number = 4)
 modelFit <- train(trainSet$classe ~.,data = trainSet, method="rf", trControl = trainCtrl)
